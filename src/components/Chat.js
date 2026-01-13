@@ -1,8 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react'; 
-import { addDoc, collection, onSnapshot, orderBy, query, serverTimestamp, where, doc, getDoc } from 'firebase/firestore'; 
-import { db } from '../firebase-config';
-
-const ROOM_SESSIONS_COLLECTION = "roomSessions"; 
+import { API_BASE } from '../api-config';
 
 const Chat = (props) => {
   // Takes userNick from App.js
@@ -14,27 +11,27 @@ const Chat = (props) => {
 
   // automated scroll Ref
   const messagesContainerRef = useRef(null); 
+  const wsRef = useRef(null);
 
-  const messageRef = collection(db, "messages");
+  // Function to get a color for each user
+  const getColorForUser = (nick) => {
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#3b82f6', '#14b8a6', '#eab308', '#dc2626', '#a855f7', '#0891b2', '#65a30d'];
+    let hash = 0;
+    for (let i = 0; i < nick.length; i++) {
+      hash = nick.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
 
   useEffect(() => {
     if (!userNick || !room) return;
 
-    const userSessionDocRef = doc(db, ROOM_SESSIONS_COLLECTION, userNick);
-
     const fetchExitTime = async () => {
         try {
-            const docSnap = await getDoc(userSessionDocRef);
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                const timestamp = data[room]; 
-
-                if (timestamp) {
-
-                  setLastExitTime(timestamp.toDate()); 
-                } else {
-                    setLastExitTime(null);
-                }
+            const response = await fetch(`${API_BASE}/room_sessions/${userNick}/${room}`);
+            const data = await response.json();
+            if (data.last_exit) {
+                setLastExitTime(new Date(data.last_exit));
             } else {
                 setLastExitTime(null);
             }
@@ -55,30 +52,36 @@ const Chat = (props) => {
       return;
     }
 
-    const queryMessages = query(
-      messageRef,
-      where("room", "==", room),
-      orderBy("createdAt")
-    );
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/messages/${room}`);
+        const fetchedMessages = await response.json();
+        const parsedMessages = fetchedMessages.map(m => ({ ...m, createdAt: new Date(m.created_at) }));
+        const filteredMessages = lastExitTime
+          ? parsedMessages.filter(msg => msg.createdAt > lastExitTime)
+          : parsedMessages; 
+        setMessages(filteredMessages);
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
 
-    const unsubscribe = onSnapshot(queryMessages, (snapshot) => {
-      let fetchedMessages = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
+    fetchMessages();
 
-        fetchedMessages.push({ ...data, id: doc.id, createdAt: data.createdAt ? data.createdAt.toDate() : new Date() }); 
-      });
-
-      const filteredMessages = lastExitTime
-        ? fetchedMessages.filter(msg => msg.createdAt > lastExitTime)
-        : fetchedMessages; 
-
-      setMessages(filteredMessages);
-    });
+    console.log('API_BASE:', API_BASE);
+    const wsUrl = API_BASE.replace('http', 'ws');
+    console.log('wsUrl:', wsUrl);
+    wsRef.current = new WebSocket(`${wsUrl}/ws/${room}`);    wsRef.current.onopen = () => console.log('WS open for room', room);
+    wsRef.current.onerror = (error) => console.log('WS error', error);    wsRef.current.onmessage = (event) => {
+      console.log('WS received:', event.data);
+      const data = JSON.parse(event.data);
+      setMessages(prev => [...prev, { ...data, createdAt: new Date(data.created_at) }]);
+    };
 
     return () => {
-      console.log(`Disiscrizione dal listener Firestore per la stanza: ${room}`);
-      unsubscribe();
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
     }
 
   }, [room, lastExitTime]); 
@@ -99,12 +102,15 @@ const Chat = (props) => {
     setNewMessage("");
 
     try {
-        await addDoc(messageRef, {
-            text: messageToSend,
-            createdAt: serverTimestamp(),
-            user: userNick,
-            room: room
+        const response = await fetch(`${API_BASE}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: messageToSend, user: userNick, room: room })
         });
+        if (!response.ok) {
+          throw new Error('Failed to send message');
+        }
+        // WebSocket will handle broadcasting
     } catch (error) {
         console.error("Error sending message:", error);
         setNewMessage(messageToSend); 
@@ -117,7 +123,7 @@ const Chat = (props) => {
     <div className='container'>
       <div className='chat-app'>
         <div className='header'>
-          Welcome to: {room.toUpperCase()}
+          Welcome to: {room.toUpperCase()} as {userNick}
         </div>
         <div
           className='messages'
@@ -139,7 +145,7 @@ const Chat = (props) => {
                 padding: '5px',
               }}
             >
-              <span className='user' style={{ fontWeight: 'bold', color: '#6366f1' }}>
+              <span className='user' style={{ fontWeight: 'bold', color: getColorForUser(message.user) }}>
                 {message.user}:
               </span>
               <span>
@@ -153,6 +159,12 @@ const Chat = (props) => {
              className='new-message-input'
             placeholder='Messaggio...'
             onChange={(e) => setNewMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
             value={newMessage}
           />
           <button type='submit' className='send-button' style={{ padding: '10px 15px' }}>

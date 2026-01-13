@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Auth from './components/Auth';
 import Chat from './components/Chat';
-import { db } from './firebase-config';
-// We need deleteDoc to free the nickname
-import { doc, deleteDoc } from 'firebase/firestore'; 
+import { API_BASE } from './api-config';
 import { Grid } from '@mui/material';
 import './style.scss';
 
@@ -16,9 +14,8 @@ function App() {
 useEffect(() => {
   const handleBeforeUnload = async () => {
     if (isAuth && userData) {
-      const userId = `${userData.room}_${userData.nick}`;
       try {
-        await deleteDoc(doc(db, "active_users", userId));
+        await fetch(`${API_BASE}/active_users/${userData.room}/${userData.nick}`, { method: 'DELETE' });
       } catch (e) {
         console.error("Error removing user:", e);
       }
@@ -37,14 +34,24 @@ useEffect(() => {
     if (!userData) return;
 
     // 1. Free the Nickname in the Database
-    const userId = `${userData.room}_${userData.nick}`;
     try {
-        await deleteDoc(doc(db, "active_users", userId));
+        await fetch(`${API_BASE}/active_users/${userData.room}/${userData.nick}`, { method: 'DELETE' });
     } catch (e) {
         console.error("Error removing user:", e);
     }
 
-    // 2. Reset Local State
+    // 2. Set last exit
+    try {
+        await fetch(`${API_BASE}/room_sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nick: userData.nick, room: userData.room })
+        });
+    } catch (e) {
+        console.error("Error setting session:", e);
+    }
+
+    // 3. Reset Local State
     setIsAuth(false);
     setUserData(null);
   };

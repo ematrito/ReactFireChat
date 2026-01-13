@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8080:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./chat.db
+      - ALLOWED_ORIGINS=*
+    volumes:
+      - ./backend/chat.db:/app/chat.db
+    networks:
+      - chat-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3000"
+    environment:
+      - REACT_APP_API_BASE=http://localhost:8080
+    depends_on:
+      - backend
+    networks:
+      - chat-net
+
+networks:
+  chat-net:
+    driver: bridge
