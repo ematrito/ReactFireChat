@@ -17,6 +17,12 @@ export const Auth = ({ setIsAuth, setUserData }) => {
         }
 
         console.log("Starting authentication...");
+        console.log("API_BASE value:", API_BASE);
+        
+        // Alert for mobile debugging - shows actual value
+        if (window.innerWidth <= 768) {
+            alert(`API_BASE: ${API_BASE}\nFull URL: ${API_BASE}/session`);
+        }
 
         let cleanNick = tempNick.trim().replace(/\s/g, '_');
         const cleanRoom = tempRoom.trim().toUpperCase();
@@ -31,7 +37,9 @@ export const Auth = ({ setIsAuth, setUserData }) => {
         try {
             // 1. CHECK IF NICKNAME IS IN COOLDOWN
             console.log("checking cooldown...");
-            const sessionResponse = await fetch(`${API_BASE}/room_sessions/${cleanNick}/${cleanRoom}`);
+            const sessionUrl = `${API_BASE}/room_sessions/${cleanNick}/${cleanRoom}`;
+            console.log("Fetching:", sessionUrl);
+            const sessionResponse = await fetch(sessionUrl);
             const sessionData = await sessionResponse.json();
             if (sessionData.last_exit) {
                 const lastExit = new Date(sessionData.last_exit);
