@@ -14,6 +14,15 @@
 #web
 .env
 
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+backend/chat.db
+*.pyc
+__pycache__/
+*.db
+
 # misc
 .DS_Store
 .env.local
