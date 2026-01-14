@@ -14,9 +14,11 @@ Lightweight real-time chat migrated from Firebase to a FastAPI + SQLite backend,
 - Security hardening: nickname/room validation, message length caps, rate limiting, CORS safeguards, stale session cleanup
 
 ### Live Demo
-🚀 **Coming Soon** - Currently deploying to Render.com
+🚀 **[Try it now!](https://reactfirechat-fe.onrender.com)** 
 
-Once live, you'll be able to try the chat directly in your browser.
+**Note:** Best experience on desktop browsers. Mobile support is currently being investigated.
+
+> ⚠️ Free tier services spin down after 15 minutes of inactivity. First load may take 30-50 seconds.
 
 ### Key Features
 - **Real-time messaging** via WebSockets
