@@ -8,10 +8,9 @@ import './style.scss';
 function App() {
   const [isAuth, setIsAuth] = useState(false);
   
-  // We store the current user info here
   const [userData, setUserData] = useState(null);
-  // This tries to delete the nickname if the user closes the browser.
-useEffect(() => {
+
+  useEffect(() => {
   const handleBeforeUnload = async () => {
     if (isAuth && userData) {
       try {
@@ -33,14 +32,12 @@ useEffect(() => {
   const signUserOut = async () => {
     if (!userData) return;
 
-    // 1. Free the Nickname in the Database
     try {
         await fetch(`${API_BASE}/active_users/${userData.room}/${userData.nick}`, { method: 'DELETE' });
     } catch (e) {
         console.error("Error removing user:", e);
     }
 
-    // 2. Set last exit
     try {
         await fetch(`${API_BASE}/room_sessions`, {
             method: 'POST',
@@ -51,7 +48,6 @@ useEffect(() => {
         console.error("Error setting session:", e);
     }
 
-    // 3. Reset Local State
     setIsAuth(false);
     setUserData(null);
   };

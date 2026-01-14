@@ -2,18 +2,15 @@ import React, { useEffect, useState, useRef } from 'react';
 import { API_BASE } from '../api-config';
 
 const Chat = (props) => {
-  // Takes userNick from App.js
   const { room, userNick } = props; 
 
   const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [lastExitTime, setLastExitTime] = useState(null);
 
-  // automated scroll Ref
   const messagesContainerRef = useRef(null); 
   const wsRef = useRef(null);
 
-  // Function to get a color for each user
   const getColorForUser = (nick) => {
     const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#3b82f6', '#14b8a6', '#eab308', '#dc2626', '#a855f7', '#0891b2', '#65a30d'];
     let hash = 0;
@@ -110,7 +107,6 @@ const Chat = (props) => {
         if (!response.ok) {
           throw new Error('Failed to send message');
         }
-        // WebSocket will handle broadcasting
     } catch (error) {
         console.error("Error sending message:", error);
         setNewMessage(messageToSend); 

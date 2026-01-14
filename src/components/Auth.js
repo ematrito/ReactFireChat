@@ -21,7 +21,6 @@ export const Auth = ({ setIsAuth, setUserData }) => {
         let cleanNick = tempNick.trim().replace(/\s/g, '_');
         const cleanRoom = tempRoom.trim().toUpperCase();
 
-        // Check for vulgar nicknames
         const badWords = ['fuck', 'shit', 'damn', 'bitch', 'asshole', 'bastard', 'cunt', 'dick', 'pussy', 'cock', 'tits', 'boobs'];
         if (badWords.some(word => cleanNick.toLowerCase().includes(word))) {
             setError("Nickname contains inappropriate content. Please choose another.");
@@ -68,7 +67,7 @@ export const Auth = ({ setIsAuth, setUserData }) => {
 
             // 3. SUCCESS: Update App state
             setUserData({ nick: cleanNick, room: cleanRoom });
-            setIsAuth(true); // Logged in effectively
+            setIsAuth(true); 
             setError(null);
 
         } catch (err) {
