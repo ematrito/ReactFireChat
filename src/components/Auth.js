@@ -72,7 +72,9 @@ export const Auth = ({ setIsAuth, setUserData }) => {
 
         } catch (err) {
             console.error("Error joining:", err);
-            setError("Connection error. Please try again.");
+            console.error("API_BASE:", API_BASE);
+            console.error("Error details:", err.message, err.stack);
+            setError(`Connection error: ${err.message || 'Unknown error'}. Please try again.`);
         }
         
     }
