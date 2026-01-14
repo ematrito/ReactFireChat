@@ -23,9 +23,6 @@ services:
     envVars:
       - key: REACT_APP_API_BASE
         value: "https://reactfirechat.onrender.com"
-    dockerBuildArgs:
-      - key: REACT_APP_API_BASE
-        sync: false
     routes:
       - path: "/*"
         destination: "/index.html"
