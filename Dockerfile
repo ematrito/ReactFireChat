@@ -29,5 +29,5 @@ USER appuser
 
 EXPOSE 3000
 
-# Start the server on port 3000
-CMD ["serve", "-s", "build", "-l", "3000"]
+# Start the server with proper SPA routing (all routes go to index.html)
+CMD ["serve", "-s", "build", "-l", "3000", "--no-clipboard"]
