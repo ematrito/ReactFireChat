@@ -23,9 +23,6 @@ services:
     envVars:
       - key: REACT_APP_API_BASE
         value: "https://reactfirechat.onrender.com"
-    routes:
-      - path: "/*"
-        destination: "/index.html"
 
 databases:
   - name: reafirechat-db
