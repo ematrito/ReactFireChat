@@ -9,11 +9,8 @@ RUN npm install
 
 COPY . .
 
-# Declare that this build needs an argument
-ARG REACT_APP_API_BASE
-
-# Set it as an ENV so the React build script can see it
-ENV REACT_APP_API_BASE=$REACT_APP_API_BASE
+# Render provides env vars automatically - write to .env file for React build
+RUN echo "REACT_APP_API_BASE=${REACT_APP_API_BASE}" > .env
 
 # Build the app
 RUN npm run build
