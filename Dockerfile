@@ -37,5 +37,4 @@ USER appuser
 EXPOSE 3000
 
 ENTRYPOINT ["/entrypoint.sh"]
-# Start the server with proper SPA routing (all routes go to index.html)
 # CMD ["sh", "-c", "serve -s build -l ${PORT:-3000} --no-clipboard"]
