@@ -16,14 +16,6 @@ export const Auth = ({ setIsAuth, setUserData }) => {
             return;
         }
 
-        console.log("Starting authentication...");
-        console.log("API_BASE value:", API_BASE);
-        
-        // Alert for mobile debugging - shows actual value
-        if (window.innerWidth <= 768) {
-            alert(`API_BASE: ${API_BASE}\nFull URL: ${API_BASE}/session`);
-        }
-
         let cleanNick = tempNick.trim().replace(/\s/g, '_');
         const cleanRoom = tempRoom.trim().toUpperCase();
 
@@ -36,9 +28,7 @@ export const Auth = ({ setIsAuth, setUserData }) => {
 
         try {
             // 1. CHECK IF NICKNAME IS IN COOLDOWN
-            console.log("checking cooldown...");
             const sessionUrl = `${API_BASE}/room_sessions/${cleanNick}/${cleanRoom}`;
-            console.log("Fetching:", sessionUrl);
             const sessionResponse = await fetch(sessionUrl);
             const sessionData = await sessionResponse.json();
             if (sessionData.last_exit) {
@@ -52,15 +42,12 @@ export const Auth = ({ setIsAuth, setUserData }) => {
             }
 
             // 2. CHECK IF NICKNAME EXISTS
-            console.log("checking if user exists...");
             const response = await fetch(`${API_BASE}/active_users/${cleanRoom}/${cleanNick}`);
             const data = await response.json();
             if (data.exists) {
                 setError(`Nickname "${cleanNick}" is already taken in room ${cleanRoom}.`);
                 return;
             }
-
-            console.log("Registering user...");
 
             const createResponse = await fetch(`${API_BASE}/active_users`, {
                 method: 'POST',
@@ -71,8 +58,6 @@ export const Auth = ({ setIsAuth, setUserData }) => {
                 throw new Error('Failed to create user');
             }
 
-            console.log("User registered successfully!");
-
             // 3. SUCCESS: Update App state
             setUserData({ nick: cleanNick, room: cleanRoom });
             setIsAuth(true); 
@@ -80,8 +65,6 @@ export const Auth = ({ setIsAuth, setUserData }) => {
 
         } catch (err) {
             console.error("Error joining:", err);
-            console.error("API_BASE:", API_BASE);
-            console.error("Error details:", err.message, err.stack);
             setError(`Connection error: ${err.message || 'Unknown error'}. Please try again.`);
         }
         
