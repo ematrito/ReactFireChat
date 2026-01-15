@@ -1,4 +1,4 @@
-# ReaFireChat (React + FastAPI)
+# ReactFireChat (React + FastAPI)
 
 A modern, lightweight real-time chat application. Originally built with Firebase, now completely refactored to a robust **FastAPI** backend with **PostgreSQL** persistence and **WebSocket** real-time communication.
 
