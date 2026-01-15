@@ -77,7 +77,6 @@ export const Auth = ({ setIsAuth, setUserData }) => {
                 <input
                     placeholder="Room Name"
                     onChange={(e) => setTempRoom(e.target.value)}
-                    style={{ marginBottom: '10px' }}
                 />
 
                 <input
