@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { API_BASE } from '../api-config';
 
 const Chat = (props) => {
-  const { room, userNick } = props; 
+  const { room, userNick, signUserOut } = props; 
 
   const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState([]);
@@ -119,7 +119,8 @@ const Chat = (props) => {
     <div className='container'>
       <div className='chat-app'>
         <div className='header'>
-          Welcome to: {room.toUpperCase()} as {userNick}
+          <span>Welcome to: {room.toUpperCase()} as {userNick}</span>
+          <button className='mobile-leave-btn' onClick={signUserOut}>Leave</button>
         </div>
         <div
           className='messages'
