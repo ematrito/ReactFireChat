@@ -10,7 +10,7 @@ RUN npm install
 COPY . .
 
 # Render provides env vars automatically - write to .env file for React build
-RUN echo "REACT_APP_API_BASE=${REACT_APP_API_BASE}" > .env
+#RUN echo "REACT_APP_API_BASE=${REACT_APP_API_BASE}" > .env
 
 # Build the app
 RUN npm run build
@@ -26,11 +26,16 @@ RUN npm install -g serve
 # Copy only the build artifacts from Stage 1
 COPY --from=builder /app/build ./build
 
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /entrypoint.sh
+
 # Create a non-root user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
 EXPOSE 3000
 
+ENTRYPOINT ["/entrypoint.sh"]
 # Start the server with proper SPA routing (all routes go to index.html)
-CMD ["sh", "-c", "serve -s build -l ${PORT:-3000} --no-clipboard"]
+# CMD ["sh", "-c", "serve -s build -l ${PORT:-3000} --no-clipboard"]

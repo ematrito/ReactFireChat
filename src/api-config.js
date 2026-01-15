@@ -3,7 +3,7 @@ const isDev = window.location.hostname === 'localhost' || window.location.hostna
 // In production, REACT_APP_API_BASE MUST be set during build time
 const API_BASE = isDev 
   ? 'http://localhost:8080' 
-  : (process.env.REACT_APP_API_BASE || '');
+  : (window.APP_CONFIG?.API_BASE || '');
 
 // Debug and validation
 if (!isDev) {
