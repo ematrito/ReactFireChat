@@ -124,13 +124,6 @@ const Chat = (props) => {
         <div
           className='messages'
           ref={messagesContainerRef}
-          style={{ 
-            height: '70vh',
-            overflowY: 'auto',
-            padding: '10px',
-            border: '1px solid #ccc',
-            marginBottom: '10px'
-          }}
         >
           {messages.map((message) => (
             <div
@@ -163,8 +156,13 @@ const Chat = (props) => {
             }}
             value={newMessage}
           />
-          <button type='submit' className='send-button' style={{ padding: '10px 15px' }}>
-            Invia
+          <button type='submit' className='send-button'>
+            <span className="btn-text">Invia</span>
+            <span className="btn-icon">
+              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+              </svg>
+            </span>
           </button>
         </form>
       </div>
