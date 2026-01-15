@@ -27,38 +27,19 @@ export const Auth = ({ setIsAuth, setUserData }) => {
 
 
         try {
-            // 1. CHECK IF NICKNAME IS IN COOLDOWN
-            const sessionUrl = `${API_BASE}/room_sessions/${cleanNick}/${cleanRoom}`;
-            const sessionResponse = await fetch(sessionUrl);
-            const sessionData = await sessionResponse.json();
-            if (sessionData.last_exit) {
-                const lastExit = new Date(sessionData.last_exit);
-                const now = new Date();
-                const diffMinutes = (now - lastExit) / 1000 / 60;
-                if (diffMinutes < 30) {
-                    setError(`Nickname "${cleanNick}" was used recently in room ${cleanRoom}. Please wait ${Math.ceil(30 - diffMinutes)} minutes.`);
-                    return;
-                }
-            }
-
-            // 2. CHECK IF NICKNAME EXISTS
-            const response = await fetch(`${API_BASE}/active_users/${cleanRoom}/${cleanNick}`);
-            const data = await response.json();
-            if (data.exists) {
-                setError(`Nickname "${cleanNick}" is already taken in room ${cleanRoom}.`);
-                return;
-            }
-
+            // Optimized: Single request handles validation, cooldowns, and creation
             const createResponse = await fetch(`${API_BASE}/active_users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nick: cleanNick, room: cleanRoom })
             });
+
             if (!createResponse.ok) {
-                throw new Error('Failed to create user');
+                const errData = await createResponse.json();
+                throw new Error(errData.detail || 'Failed to enter room');
             }
 
-            // 3. SUCCESS: Update App state
+            // SUCCESS: Update App state
             setUserData({ nick: cleanNick, room: cleanRoom });
             setIsAuth(true); 
             setError(null);

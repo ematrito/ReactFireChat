@@ -100,10 +100,22 @@ def check_user(room: str, nick: str, db: Session = Depends(get_db)):
 @app.post("/active_users")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     nick, room = validate_nick_and_room(user.nick, user.room)
+    
+    # 1. Check Cooldown (Server-side enforcement)
+    session_entry = db.query(RoomSession).filter(RoomSession.nick == nick, RoomSession.room == room).first()
+    if session_entry and session_entry.last_exit:
+         minutes_since_exit = (datetime.utcnow() - session_entry.last_exit).total_seconds() / 60
+         if minutes_since_exit < 30:
+             wait_time = int(30 - minutes_since_exit)
+             raise HTTPException(status_code=429, detail=f"Nickname cooldown active. Wait {wait_time}m.")
+
+    # 2. Check Duplicates
     user_id = f"{room}_{nick}"
     existing = db.query(ActiveUser).filter(ActiveUser.id == user_id).first()
     if existing:
-        raise HTTPException(status_code=400, detail="Nickname taken")
+        raise HTTPException(status_code=409, detail=f"Nickname '{nick}' is already taken in this room")
+
+    # 3. Create User
     db_user = ActiveUser(id=user_id, nick=nick, room=room)
     db.add(db_user)
     db.commit()
