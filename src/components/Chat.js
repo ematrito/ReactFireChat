@@ -146,7 +146,7 @@ const Chat = (props) => {
         <form onSubmit={handleSubmit} style={{ display: 'flex' }}>
           <textarea
              className='new-message-input'
-            placeholder='Messaggio...'
+            placeholder='Message...'
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
@@ -157,7 +157,7 @@ const Chat = (props) => {
             value={newMessage}
           />
           <button type='submit' className='send-button'>
-            <span className="btn-text">Invia</span>
+            <span className="btn-text">Send</span>
             <span className="btn-icon">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
