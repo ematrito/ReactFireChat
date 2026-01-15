@@ -31,14 +31,16 @@ app = FastAPI()
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
 allow_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
 
+# Can't use credentials with wildcard origin
 allow_credentials = "*" not in allow_origins
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
     allow_credentials=allow_credentials,
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 message_timestamps = defaultdict(list)

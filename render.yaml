@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: reafirechat-backend
+    name: rfcbe
     runtime: python
     buildCommand: "pip install -r backend/requirements.txt"
     startCommand: "cd backend && gunicorn -w 2 -b 0.0.0.0:8000 -k uvicorn.workers.UvicornWorker main:app"
@@ -11,18 +11,18 @@ services:
           name: reafirechat-db
           property: connectionString
       - key: ALLOWED_ORIGINS
-        value: "https://reactfirechat-fe.onrender.com"
+        value: "https://reactfirechat.onrender.com"
       - key: PYTHON_VERSION
         value: "3.11"
 
   - type: web
-    name: reafirechat-frontend
+    name: reafirechat
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
     envVars:
       - key: REACT_APP_API_BASE
-        value: "https://reactfirechat.onrender.com"
+        value: "https://rfcbe.onrender.com"
 
 databases:
   - name: reafirechat-db
