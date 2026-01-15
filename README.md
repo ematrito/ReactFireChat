@@ -32,13 +32,15 @@ The application is deployed as two separate Docker services on Render.com:
 
 - **Real-Time Communication:** Instant message delivery via WebSockets.
 - **Room-Based Chat:** Dynamic room creation—just enter a room name to join.
-- **Mobile Optimized:** Full-screen responsive design with touch-friendly controls.
-- **Session Management:** Unique nickname enforcement per room.
+- **Room Capacity:** Maximum 10 users per room to ensure quality conversations.
+- **Automatic Room Cleanup:** Rooms automatically expire 30 minutes after creation, keeping the database clean.
+- **Mobile Optimized:** Full-screen responsive design with sticky input controls and touch-friendly interface.
+- **Session Management:** Unique nickname enforcement per room with 30-minute cooldown after leaving.
 - **Security & Anti-Spam:**
     - Input validation and sanitization.
-    - Bad word filtering.
-    - Rate limiting protection.
+    - Rate limiting protection (15 messages per 10 seconds).
     - Automatic cleanup of inactive users.
+    - Room lifecycle management.
 - **Visuals:** Auto-generated avatar colors based on nickname hash.
 
 ---

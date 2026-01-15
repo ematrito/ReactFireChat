@@ -7,7 +7,6 @@ from models import Base, ActiveUser, Message, RoomSession
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List
-import asyncio
 import os
 import re
 from collections import defaultdict
@@ -38,12 +37,45 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allow_origins,
     allow_credentials=allow_credentials,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
 
 message_timestamps = defaultdict(list)
+room_created_at = {}  # Track when each room was created
+
+def cleanup_old_rooms(db: Session):
+    """Delete rooms that have existed for more than 30 minutes."""
+    try:
+        now = datetime.utcnow()
+        rooms_to_delete = []
+        
+        # Find rooms older than 30 minutes
+        for room, created_time in list(room_created_at.items()):
+            if now - created_time > timedelta(minutes=30):
+                rooms_to_delete.append(room)
+        
+        for room in rooms_to_delete:
+            # Delete all messages in this room
+            db.query(Message).filter(Message.room == room).delete()
+            
+            # Delete all active users in this room
+            db.query(ActiveUser).filter(ActiveUser.room == room).delete()
+            
+            # Delete all room sessions for this room
+            db.query(RoomSession).filter(RoomSession.room == room).delete()
+            
+            # Remove from tracking
+            del room_created_at[room]
+            
+            print(f"[Cleanup] Deleted room '{room}' (30 minutes lifecycle expired)")
+        
+        db.commit()
+    except Exception as e:
+        print(f"[Cleanup] Error: {e}")
+        db.rollback()
+
 def get_db():
     db = SessionLocal()
     try:
@@ -115,7 +147,17 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=409, detail=f"Nickname '{nick}' is already taken in this room")
 
-    # 3. Create User
+    # 3. Check Room Capacity (max 10 users)
+    room_user_count = db.query(ActiveUser).filter(ActiveUser.room == room).count()
+    if room_user_count >= 10:
+        raise HTTPException(status_code=403, detail="Room is full (max 10 users)")
+
+    # 4. Track room creation on first user join
+    if room not in room_created_at:
+        room_created_at[room] = datetime.utcnow()
+        print(f"[Room Created] '{room}' - will expire in 30 minutes")
+
+    # 5. Create User
     db_user = ActiveUser(id=user_id, nick=nick, room=room)
     db.add(db_user)
     db.commit()
@@ -135,11 +177,13 @@ def delete_user(room: str, nick: str, db: Session = Depends(get_db)):
 # Messages
 @app.get("/messages/{room}")
 def get_messages(room: str, db: Session = Depends(get_db)):
+    cleanup_old_rooms(db)
     messages = db.query(Message).filter(Message.room == room).order_by(Message.created_at).all()
     return [{"id": m.id, "text": m.text, "created_at": m.created_at.isoformat(), "user": m.user, "room": m.room} for m in messages]
 
 @app.post("/messages")
 async def create_message(message: MessageCreate, request: Request,db: Session = Depends(get_db)):
+    cleanup_old_rooms(db)
 
     if len(message.text) > 2000:
         raise HTTPException(status_code=400, detail="Message too long (max 2000 characters)")
@@ -155,7 +199,7 @@ async def create_message(message: MessageCreate, request: Request,db: Session = 
          if now - ts < timedelta(seconds=10)
     ]  
 
-    if len(message_timestamps[client_ip]) >= 5:
+    if len(message_timestamps[client_ip]) >= 60:
         raise HTTPException(status_code=429, detail="Too many messages sent. Please slow down.")
     
     message_timestamps[client_ip].append(now)
