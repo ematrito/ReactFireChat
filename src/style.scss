@@ -296,6 +296,8 @@
                 margin-left: 10px;
                 padding: 0;
                 height: 50px;
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
 
                 .btn-text {
                     display: none;
@@ -305,6 +307,11 @@
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    pointer-events: none;
+                }
+
+                svg {
+                    pointer-events: none;
                 }
             }
         }
