@@ -157,7 +157,7 @@ const Chat = (props) => {
             }}
             value={newMessage}
           />
-          <button type='submit' className='send-button'>
+          <button type='button' className='send-button' onClick={handleSubmit}>
             <span className="btn-text">Send</span>
             <span className="btn-icon">
               <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
