@@ -77,8 +77,6 @@ docker compose up --build
 
 - Frontend: http://localhost:3002
 - Backend API: http://localhost:8080
-
-Data is stored in `backend/chat.db`. Rooms and data are ephemeral — they reset on container restart.
 ---
 
 ## 📄 License
