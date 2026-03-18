@@ -143,8 +143,8 @@ def check_user(room: str, nick: str, db: Session = Depends(get_db)):
 @app.post("/active_users")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     nick, room = validate_nick_and_room(user.nick, user.room)
-    
-    # 1. Check Cooldown (Server-side enforcement)
+
+
     session_entry = db.query(RoomSession).filter(RoomSession.nick == nick, RoomSession.room == room).first()
     if session_entry and session_entry.last_exit:
          minutes_since_exit = (datetime.utcnow() - session_entry.last_exit).total_seconds() / 60

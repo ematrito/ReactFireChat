@@ -27,7 +27,6 @@ export const Auth = ({ setIsAuth, setUserData }) => {
 
 
         try {
-            // Optimized: Single request handles validation, cooldowns, and creation
             const createResponse = await fetch(`${API_BASE}/active_users`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },

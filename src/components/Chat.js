@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { API_BASE } from '../api-config';
 
 const Chat = (props) => {
@@ -66,10 +66,14 @@ const Chat = (props) => {
     fetchMessages();
 
     console.log('API_BASE:', API_BASE);
+    
     const wsUrl = API_BASE.replace('http', 'ws');
     console.log('wsUrl:', wsUrl);
     wsRef.current = new WebSocket(`${wsUrl}/ws/${room}`); wsRef.current.onopen = () => console.log('WS open for room', room);
-    wsRef.current.onerror = (error) => console.log('WS error', error); wsRef.current.onmessage = (event) => {
+    
+    wsRef.current.onerror = (error) => console.log('WS error', error); 
+    
+    wsRef.current.onmessage = (event) => {
       console.log('WS received:', event.data);
       const data = JSON.parse(event.data);
       setMessages(prev => [...prev, { ...data, createdAt: new Date(data.created_at) }]);
