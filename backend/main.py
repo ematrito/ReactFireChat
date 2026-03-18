@@ -160,7 +160,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
             db.delete(existing)
             db.commit()
         else:
-        raise HTTPException(status_code=409, detail=f"Nickname '{nick}' is already taken in this room")
+            raise HTTPException(status_code=409, detail=f"Nickname '{nick}' is already taken in this room")
 
     # 3. Check Room Capacity (max 10 users)
     room_user_count = db.query(ActiveUser).filter(ActiveUser.room == room).count()
