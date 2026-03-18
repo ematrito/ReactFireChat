@@ -24,6 +24,19 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+# On every server restart, reads active users from DB to repopulate room_created_at — so room expiry cleanup keeps working after Render spins the service back up.
+@app.on_event("startup")
+def startup_rebuild_room_state():
+    db = SessionLocal()
+    try:
+        users = db.query(ActiveUser).all()
+        for user in users:
+            if user.room not in room_created_at:
+                room_created_at[user.room] = user.entered_at
+        print(f"[Startup] Rebuilt room state: {list(room_created_at.keys())}")
+    finally:
+        db.close()
+
 allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
 allow_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
 
@@ -142,6 +155,10 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     user_id = f"{room}_{nick}"
     existing = db.query(ActiveUser).filter(ActiveUser.id == user_id).first()
     if existing:
+        if datetime.utcnow() - existing.entered_at > timedelta(hours=1):
+            db.delete(existing)
+            db.commit()
+        else:
         raise HTTPException(status_code=409, detail=f"Nickname '{nick}' is already taken in this room")
 
     # 3. Check Room Capacity (max 10 users)
