@@ -10,4 +10,4 @@ COPY . .
 EXPOSE 8000
 
 # Run with gunicorn for production
-CMD ["sh", "-c", "gunicorn -w 2 -b 0.0.0.0:${PORT:-8000} -k uvicorn.workers.UvicornWorker main:app"]
+CMD ["sh", "-c", "gunicorn -w 1 -b 0.0.0.0:${PORT:-8000} -k uvicorn.workers.UvicornWorker main:app"]
