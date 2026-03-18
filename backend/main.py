@@ -16,10 +16,7 @@ from fastapi.responses import HTMLResponse
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./chat.db")
 
-if DATABASE_URL.startswith("postgres://") or DATABASE_URL.startswith("postgresql://"):
-    engine = create_engine(DATABASE_URL)
-else:
-    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

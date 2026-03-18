@@ -1,14 +1,14 @@
 # ReactFireChat (React + FastAPI)
 
-A modern, lightweight real-time chat application. Originally built with Firebase, now completely refactored to a robust **FastAPI** backend with **PostgreSQL** persistence and **WebSocket** real-time communication.
+A modern, lightweight real-time chat application. Originally built with Firebase, now completely refactored to a robust **FastAPI** backend with **SQLite** and **WebSocket** real-time communication.
 
-🚀 **[Live Demo: https://reactfirechat.onrender.com\]\(https://reactfirechat.onrender.com/\)\*\*
+ **[Live Demo: https://reactfirechat.onrender.com\]\(https://reactfirechat.onrender.com/\)\*\*
 
 > **Note:** The application runs on Render's Free Tier. If you are the first visitor in a while, please allow **30-50 seconds** for the services to spin up.
 
 ---
 
-## 🏗️ Architecture & Refactor
+## Architecture & Refactor
 
 This project started as a serverless experiment using Firebase Realtime Database. To gain more control over the infrastructure, improve performance, and learn modern backend patterns, it was migrated to a containerized microservices architecture.
 
@@ -17,18 +17,17 @@ This project started as a serverless experiment using Firebase Realtime Database
 - **New Architecture:** 
   - **Frontend:** React application serves as a dumb client, communicating via REST and WebSockets.
   - **Backend:** Python FastAPI handles business logic, validation, and state management.
-  - **Persistence:** SQLAlchemy with PostgreSQL (Production) or SQLite (Local).
   - **Real-time:** Native WebSockets replacing Firebase listeners.
 
 ### **Current System Design**
 The application is deployed as two separate Docker services on Render.com:
 1.  **Frontend Service:** Nginx/Node container serving the React SPA.
 2.  **Backend Service:** Python container running FastAPI with Uvicorn/Gunicorn.
-3.  **Database:** Managed PostgreSQL instance.
+3.  **Database:** Managed SQLite since data are ephemeral (rooms disappear after 30 minutes).
 
 ---
 
-## ✨ Features
+## Features
 
 - **Real-Time Communication:** Instant message delivery via WebSockets.
 - **Room-Based Chat:** Dynamic room creation—just enter a room name to join.
@@ -45,7 +44,7 @@ The application is deployed as two separate Docker services on Render.com:
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 ### **Frontend**
 - **Library:** React 18
@@ -57,14 +56,29 @@ The application is deployed as two separate Docker services on Render.com:
 - **Framework:** FastAPI (Python 3.11)
 - **ASGI Server:** Uvicorn + Gunicorn
 - **ORM:** SQLAlchemy
-- **Database:** PostgreSQL (Prod) / SQLite (Dev)
+- **Database:** SQLite
 - **Protocol:** REST API + WebSocket
 
 ### **DevOps**
 - **Containerization:** Docker & Docker Compose
-- **Hosting:** Render.com (Web Services + Managed DB)
+- **Hosting:** Render.com (Web Services)
 - **Config:** Dynamic runtime configuration via Entrypoint scripts
 
+
+## Run Locally
+
+Requires [Docker](https://www.docker.com/) and Docker Compose.
+
+```bash
+git clone https://github.com/your-user/reafirechat.git
+cd reafirechat
+docker compose up --build
+```
+
+- Frontend: http://localhost:3002
+- Backend API: http://localhost:8080
+
+Data is stored in `backend/chat.db`. Rooms and data are ephemeral — they reset on container restart.
 ---
 
 ## 📄 License
