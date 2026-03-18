@@ -2,7 +2,7 @@
 
 A modern, lightweight real-time chat application. Originally built with Firebase, now completely refactored to a robust **FastAPI** backend with **SQLite** and **WebSocket** real-time communication.
 
- **[Live Demo: https://reactfirechat.onrender.com\]\(https://reactfirechat.onrender.com/\)\*\*
+**[Live Demo](https://reactfirechat.onrender.com)**
 
 > **Note:** The application runs on Render's Free Tier. If you are the first visitor in a while, please allow **30-50 seconds** for the services to spin up.
 
