@@ -26,7 +26,7 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "*")
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "")
 allow_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
 
 app.add_middleware(
@@ -95,8 +95,6 @@ def cleanup_old_rooms(db: Session):
         now = datetime.utcnow()
         tokens_to_delete = []
         for token_hash, data in list(room_tokens.items()):
-            if data is None:
-                continue
             if now - data["created_at"] > timedelta(minutes=ROOM_LIFETIME_MINUTES):
                 tokens_to_delete.append(token_hash)
         for token_hash in tokens_to_delete:
@@ -238,6 +236,8 @@ def join_room(req: JoinRequest, db: Session = Depends(get_db)):
 
 @app.get("/messages/{token_hash}")
 def get_messages(token_hash: str, db: Session = Depends(get_db)):
+    if token_hash not in room_tokens:
+        return []
     cleanup_old_rooms(db)
     msgs = db.query(Message).filter(Message.token_hash == token_hash).order_by(Message.created_at).all()
     return [{"id": m.id, "ciphertext": m.ciphertext, "created_at": m.created_at.isoformat(), "token_hash": m.token_hash} for m in msgs]
@@ -245,6 +245,9 @@ def get_messages(token_hash: str, db: Session = Depends(get_db)):
 
 @app.post("/messages")
 async def create_message(msg: MessageRequest, request: Request, db: Session = Depends(get_db)):
+    if msg.token_hash not in room_tokens:
+        raise HTTPException(status_code=404, detail="Room not found or expired")
+
     deleted_rooms = cleanup_old_rooms(db)
 
     if len(msg.ciphertext) > 10000:
@@ -296,6 +299,10 @@ connected_clients = {}
 async def websocket_endpoint(websocket: WebSocket, token_hash: str):
     await websocket.accept()
 
+    if token_hash not in room_tokens:
+        await websocket.close(code=1008, reason="Room not found or expired")
+        return
+
     key = room_keys.get(token_hash)
     if key:
         await websocket.send_text(json.dumps({"type": "room_key", "key": key}))
@@ -321,3 +328,8 @@ async def websocket_endpoint(websocket: WebSocket, token_hash: str):
 def manual_cleanup(db: Session = Depends(get_db)):
     deleted = cleanup_old_rooms(db)
     return {"deleted_rooms": len(deleted)}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "rooms": len(room_tokens)}
