@@ -156,6 +156,18 @@
                 font-size: 0.9em;
                 margin-left: 15px;
             }
+
+            .share-btn {
+                background: transparent;
+                border: 1px solid #aaa;
+                color: #ccc;
+                padding: 4px 10px;
+                border-radius: 6px;
+                font-size: 0.8rem;
+                cursor: pointer;
+                flex-shrink: 0;
+                &:hover { color: #fff; border-color: #fff; }
+            }
         }
 
         .expired-banner {
@@ -185,6 +197,84 @@
                 &:hover {
                     background: #5ab848;
                     transform: translateY(-1px);
+                }
+            }
+        }
+
+        .share-panel {
+            background: #1a2a1a;
+            border-bottom: 2px solid #4c983b;
+            padding: 16px 20px;
+            width: 100%;
+
+            .share-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 12px;
+                font-weight: bold;
+                color: #4c983b;
+
+                button {
+                    background: none;
+                    border: none;
+                    color: #999;
+                    font-size: 1.4rem;
+                    cursor: pointer;
+                    &:hover { color: #fff; }
+                }
+            }
+
+            .share-body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 12px;
+
+                .qr-code {
+                    width: 160px;
+                    height: 160px;
+                    border-radius: 8px;
+                    border: 2px solid #4c983b;
+                    background: white;
+                    padding: 4px;
+                }
+
+                .share-url {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    width: 100%;
+                    max-width: 400px;
+
+                    code {
+                        flex: 1;
+                        background: #111;
+                        padding: 8px 12px;
+                        border-radius: 6px;
+                        font-size: 0.8rem;
+                        word-break: break-all;
+                        color: #aaa;
+                    }
+
+                    .copy-btn {
+                        background: #4c983b;
+                        color: white;
+                        border: none;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        font-size: 0.85rem;
+                        cursor: pointer;
+                        white-space: nowrap;
+                        &:hover { background: #5ab848; }
+                    }
+                }
+
+                .share-note {
+                    color: #888;
+                    font-size: 0.8rem;
+                    text-align: center;
+                    margin: 0;
                 }
             }
         }
@@ -263,6 +353,11 @@
 }
 
 @media (max-width: 768px) {
+    html, body {
+        height: 100%;
+        overflow: hidden;
+    }
+
     .sign-out {
         display: none;
     }
@@ -272,9 +367,6 @@
         padding: 0;
         width: 100%;
         height: 100dvh;
-        position: fixed;
-        top: 0;
-        left: 0;
     }
 
     .container .chat-app {
@@ -287,6 +379,9 @@
         flex-direction: column;
 
         .header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
             padding: 10px 12px;
             font-size: 0.85rem;
             flex-shrink: 0;
@@ -320,6 +415,39 @@
                 font-weight: bold;
                 cursor: pointer;
                 flex-shrink: 0;
+            }
+
+            .share-btn {
+                display: block;
+                background: transparent;
+                border: 1px solid #aaa;
+                color: #ccc;
+                padding: 4px 8px;
+                border-radius: 6px;
+                font-size: 0.7rem;
+                cursor: pointer;
+                flex-shrink: 0;
+            }
+        }
+
+        .share-panel {
+            padding: 12px;
+
+            .share-body {
+                .qr-code {
+                    width: 120px;
+                    height: 120px;
+                }
+
+                .share-url code {
+                    font-size: 0.7rem;
+                    padding: 6px 8px;
+                }
+
+                .copy-btn {
+                    font-size: 0.75rem;
+                    padding: 6px 12px;
+                }
             }
         }
 

@@ -1,49 +1,85 @@
 # ReactFireChat — Ephemeral & Traceless
 
-A no-leaks, no-tracks real-time chat. Every room self-destructs after 5 minutes from creation. No chat history persists — your conversations leave zero footprint. Built for private, throwaway discussions.
+A no-leaks, no-tracks real-time chat. Rooms self-destruct 5 minutes after creation. Messages are encrypted end-to-end — the server never sees plaintext. No accounts, no logs, no cookies. Built for truly private, throwaway conversations.
 
 **[Live Demo](https://malnutreetofirechat.duckdns.org)**
 
 ---
 
-## Why Ephemeral
+## Why Ephemeral & Traceless
 
-- **No storage:** Messages live only while the room is active. 5 minutes after creation, everything is wiped.
-- **No accounts:** Just pick a nickname and a room name. No email, no signup, no identity tracking.
-- **No traces:** No message logs, no user analytics, no cookies. Once a room expires, nothing remains.
-- **Countdown visible:** Every room shows a live countdown timer so you know exactly when it self-destructs.
-- **Graceful exit:** When a room expires, all participants are notified in-app with a clear message.
+| Layer | Protection |
+|---|---|
+| **Network** | HTTPS + WSS — messages encrypted in transit |
+| **Application** | AES-256-GCM — messages encrypted in the browser, server stores only ciphertext |
+| **Key delivery** | WSS only — AES key never touches HTTP response or nginx logs |
+| **Database** | Zero plaintext — nicknames, room names, and message content are all opaque blobs |
+| **Access** | One-time token URLs — no accounts, no email, no signup |
+| **Rate limiting** | Hashed IPs — raw IPs never stored in memory |
+| **Headers** | CSP, X-Content-Type-Options, X-Frame-Options, no-referrer |
+| **Logging** | nginx access logs disabled — no connection records |
+| **Retention** | 5-minute room lifetime — everything wiped on expiry, nothing persists |
+
+- **Server sees nothing:** The encryption key lives in-memory on the server for 5 minutes, delivered once via WSS. All encryption/decryption happens in the browser.
+- **DB dump = useless:** Every column is a SHA-256 hash or AES-GCM ciphertext. Even with full database access, there's nothing to read.
+- **Room self-destruct is transparent:** A live countdown timer shows remaining life. When the room expires, all participants are notified.
+
+---
+
+## How it works
+
+```
+Creator opens site → enters room name + nickname → generates token URL + QR code
+Creator shares URL with friends
+
+Joiners open URL → enter nickname → join via token → receive AES key over WSS
+
+All messages:
+  SEND: browser encrypts → POST ciphertext → server stores + broadcasts
+  RECV: server pushes ciphertext via WSS → browser decrypts
+
+5 min from creation:
+  → room token, AES key, messages, user data → all deleted
+  → DB, memory, nothing recoverable
+```
 
 ---
 
 ## Architecture
 
-Originally Firebase-powered, now fully refactored to a **FastAPI + SQLite + WebSocket** stack:
-
 | Layer | Technology |
 |---|---|
 | Frontend | React 18, SCSS, Material UI |
 | Backend | Python FastAPI, Uvicorn/Gunicorn |
-| Real-time | Native WebSockets |
-| Database | SQLite (in-memory workflow, no durable storage needed) |
+| Real-time | Native WebSockets (server-to-client only) |
+| Encryption | Web Crypto API — AES-256-GCM |
+| Database | SQLite (ephemeral — schema is hash + ciphertext only) |
 | Hosting | Oracle Cloud Always-Free (ARM, 4 OCPU, 24 GB RAM) |
 
-### The Migration (Firebase → FastAPI)
-- **Old:** React talking directly to Firebase (serverless, vendor-locked)
-- **New:** React communicates via REST and WebSockets to a self-hosted FastAPI backend with full control over validation, rate limiting, and state.
+### API Endpoints
+
+| Method | Path | Body | Purpose |
+|---|---|---|---|
+| POST | `/create_room` | `{nick, room}` | Create room, returns token |
+| POST | `/join` | `{nick, token}` | Join room via token (token in body, not URL) |
+| GET | `/messages/{token_hash}` | — | Fetch message history (ciphertext only) |
+| POST | `/messages` | `{ciphertext, token_hash}` | Send encrypted message |
+| WS | `/ws/{token_hash}` | — | Real-time messages + key delivery |
 
 ---
 
 ## Features
 
+- **End-to-end encrypted:** AES-256-GCM in the browser. Server stores and forwards ciphertext only.
+- **Token-based rooms:** One-time shareable URL + QR code. No passwords.
+- **Full DB opacity:** Nicknames, room names, messages — all encrypted or hashed. Nothing recoverable from the database file.
 - **Real-time:** Instant message delivery via WebSockets.
-- **5-minute rooms:** Rooms auto-expire 5 minutes after creation. A countdown timer shows remaining life.
-- **Graceful expiry:** All participants receive an in-app notification when the room closes.
+- **5-minute lifetime:** Auto-expiry with countdown timer visible in the UI.
+- **Graceful shutdown:** All participants notified when the room expires.
 - **Room capacity:** Max 10 users per room.
-- **Mobile-optimized:** Full-screen responsive design with sticky input and touch-friendly UI.
-- **Nickname cooldown:** 5-minute lockout after leaving a room (prevents rapid rejoin spam).
-- **Anti-spam:** Input validation, rate limiting (60 messages per 10s), and automatic cleanup.
-- **Unique colors:** Avatar colors derived from nickname hash.
+- **Mobile-optimized:** Full-screen responsive design with sticky input.
+- **Anti-spam:** Rate limiting (60 messages per 10 seconds) + input validation.
+- **Automatic cleanup:** Background task clears expired rooms every 30 seconds.
 
 ---
 
@@ -51,70 +87,16 @@ Originally Firebase-powered, now fully refactored to a **FastAPI + SQLite + WebS
 
 ### Frontend
 - React 18, SCSS, Material-UI
-- React Hooks + WebSocket event listeners
+- Web Crypto API (`crypto.subtle`) for AES-GCM
+- `qrcode` for QR code generation
+- WebSocket for real-time
 - Create React App (Dockerized multi-stage build)
 
 ### Backend
 - FastAPI (Python 3.11)
 - Uvicorn + Gunicorn (`-w 1` for shared WebSocket state)
 - SQLAlchemy ORM + SQLite
-- REST API + WebSocket
-
----
-
-## Run Locally
-
-Requires Docker and Docker Compose:
-
-```bash
-git clone https://github.com/ematrito/ReactFireChat.git
-cd ReactFireChat
-docker compose up --build
-```
-
-- Frontend: http://localhost:3002
-- Backend API: http://localhost:8080
-
-Or without Docker:
-
-```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-gunicorn -w 1 -k uvicorn.workers.UvicornWorker main:app -b 127.0.0.1:8080
-
-# Frontend
-npm install && npm start
-```
-
----
-
-## Deployment
-
-### Oracle Cloud Always-Free
-
-1. Provision a **VM.Standard.A1.Flex** instance (4 OCPU, 24 GB RAM, Ubuntu 22.04)
-2. Install dependencies: `python3-pip`, `nginx`, `nodejs`
-3. Clone the repo, build the frontend (`npm run build`)
-4. Point nginx to `build/` as root, proxy `/api/*` and `/ws/*` to gunicorn on `127.0.0.1:8000`
-5. Enable the systemd service for the backend
-
-```nginx
-server {
-    listen 80;
-    root /home/ubuntu/reactfirechat/build;
-    index index.html;
-
-    location / { try_files $uri /index.html; }
-    location /api/ { proxy_pass http://127.0.0.1:8000/api/; }
-    location /ws/  {
-        proxy_pass http://127.0.0.1:8000/ws/;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
-```
+- In-memory token → room mapping (never touches disk)
 
 ---
 
@@ -123,13 +105,27 @@ server {
 | Env Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | `sqlite:///./chat.db` | Database connection string |
-| `ALLOWED_ORIGINS` | `*` | CORS allowed origins (comma-separated) |
+| `ALLOWED_ORIGINS` | `*` | CORS allowed origins |
 
-Room lifetime and cooldown are set in `backend/main.py`:
+Room lifetime is set in `backend/main.py`:
+
 ```python
 ROOM_LIFETIME_MINUTES = 5
-COOLDOWN_MINUTES = 5
 ```
+
+---
+
+## DB Schema (opaque by design)
+
+```
+messages               active_users
+├─ ciphertext (AES)    ├─ id (SHA-256)
+├─ token_hash (SHA)    ├─ nick_hash (SHA-256)
+├─ created_at          ├─ token_hash (SHA-256)
+                       └─ entered_at
+```
+
+No columns contain human-readable nicknames, room names, or message content. Every column is either a cryptographic hash or an encrypted blob.
 
 ---
 

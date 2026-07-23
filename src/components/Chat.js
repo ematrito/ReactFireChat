@@ -1,18 +1,36 @@
 import { useEffect, useState, useRef } from 'react';
 import { API_BASE } from '../api-config';
+import { importKey, encryptMessage, decryptMessage } from '../crypto';
+import QRCode from 'qrcode';
 
 const Chat = (props) => {
-  const { room, userNick, signUserOut, roomExpiresIn } = props;
+  const { room, userNick, signUserOut, roomExpiresIn, token, tokenHash } = props;
 
   const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState([]);
-  const [lastExitTime, setLastExitTime] = useState(null);
   const [timeLeft, setTimeLeft] = useState(roomExpiresIn || 300);
   const [roomExpired, setRoomExpired] = useState(false);
+  const [key, setKey] = useState(null);
+  const [keyReceived, setKeyReceived] = useState(false);
+  const [showShare, setShowShare] = useState(true);
+  const [qrDataUrl, setQrDataUrl] = useState('');
 
   const messagesContainerRef = useRef(null);
   const wsRef = useRef(null);
   const expiryHandledRef = useRef(false);
+  const pendingRef = useRef([]);
+  const keyRef = useRef(null);
+
+  keyRef.current = key;
+
+  const shareUrl = `${window.location.origin}/#${token}`;
+
+  useEffect(() => {
+    if (!token) return;
+    QRCode.toDataURL(shareUrl, { width: 200, margin: 2 })
+      .then(setQrDataUrl)
+      .catch(console.error);
+  }, [token, shareUrl]);
 
   useEffect(() => {
     if (roomExpired || timeLeft <= 0) return;
@@ -43,83 +61,93 @@ const Chat = (props) => {
     return colors[Math.abs(hash) % colors.length];
   };
 
-  useEffect(() => {
-    if (!userNick || !room) return;
-
-    const fetchExitTime = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/room_sessions/${userNick}/${room}`);
-        const data = await response.json();
-        if (data.last_exit) {
-          setLastExitTime(new Date(data.last_exit));
-        } else {
-          setLastExitTime(null);
-        }
-      } catch (error) {
-        console.error("Errore nel recupero del timestamp di uscita:", error);
-        setLastExitTime(null);
-      }
-    };
-
-    fetchExitTime();
-
-  }, [userNick, room]);
-
-
-  useEffect(() => {
-    if (!room) {
-      setMessages([]);
-      return;
+  const appendDecrypted = async (cryptoKey, ciphertext, msgId, createdAt) => {
+    try {
+      const dec = await decryptMessage(cryptoKey, ciphertext);
+      setMessages(prev => [...prev, { id: msgId, user: dec.n, text: dec.t, createdAt: new Date(createdAt) }]);
+    } catch {
+      setMessages(prev => [...prev, { id: msgId, user: '?', text: '[encrypted]', createdAt: new Date(createdAt) }]);
     }
+  };
 
-    const fetchMessages = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/messages/${room}`);
-        const fetchedMessages = await response.json();
-        const parsedMessages = fetchedMessages.map(m => ({ ...m, createdAt: new Date(m.created_at) }));
-        const filteredMessages = lastExitTime
-          ? parsedMessages.filter(msg => msg.createdAt > lastExitTime)
-          : parsedMessages;
-        setMessages(filteredMessages);
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
-    };
+  useEffect(() => {
+    if (!tokenHash) return;
 
-    fetchMessages();
-
-    console.log('API_BASE:', API_BASE);
-    
     const wsUrl = API_BASE.replace('http', 'ws');
-    console.log('wsUrl:', wsUrl);
-    wsRef.current = new WebSocket(`${wsUrl}/ws/${room}`); wsRef.current.onopen = () => console.log('WS open for room', room);
-    
-    wsRef.current.onerror = (error) => console.log('WS error', error); 
-    
-    wsRef.current.onmessage = (event) => {
-      console.log('WS received:', event.data);
+    const ws = new WebSocket(`${wsUrl}/ws/${tokenHash}`);
+
+    ws.onmessage = async (event) => {
       const data = JSON.parse(event.data);
+
+      if (data.type === 'room_key') {
+        const cryptoKey = await importKey(data.key);
+        setKey(cryptoKey);
+        setKeyReceived(true);
+
+        for (const msg of pendingRef.current) {
+          await appendDecrypted(cryptoKey, msg.ciphertext, msg.id, msg.created_at);
+        }
+        pendingRef.current = [];
+        return;
+      }
+
       if (data.type === 'room_expired') {
         if (!expiryHandledRef.current) {
           expiryHandledRef.current = true;
           setRoomExpired(true);
-          if (wsRef.current) {
-            wsRef.current.close();
-          }
+          ws.close();
         }
         return;
       }
-      setMessages(prev => [...prev, { ...data, createdAt: new Date(data.created_at) }]);
+
+      if (data.type === 'message') {
+        const k = keyRef.current;
+        if (k) {
+          await appendDecrypted(k, data.ciphertext, data.id, data.created_at);
+        } else {
+          pendingRef.current.push(data);
+        }
+      }
     };
 
-    return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
+    wsRef.current = ws;
+    return () => ws.close();
+  }, [tokenHash]);
+
+  useEffect(() => {
+    if (!tokenHash || !key) return;
+
+    const fetchMessages = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/messages/${tokenHash}`);
+        const msgs = await res.json();
+        const decrypted = await Promise.all(
+          msgs.map(async (m) => {
+            try {
+              const dec = await decryptMessage(key, m.ciphertext);
+              return { id: m.id, user: dec.n, text: dec.t, createdAt: new Date(m.created_at) };
+            } catch {
+              return { id: m.id, user: '?', text: '[encrypted]', createdAt: new Date(m.created_at) };
+            }
+          })
+        );
+        setMessages(prev => {
+          const existing = new Set(prev.map(m => m.id));
+          const combined = [...prev];
+          for (const msg of decrypted) {
+            if (!existing.has(msg.id)) {
+              combined.push(msg);
+            }
+          }
+          return combined.sort((a, b) => a.createdAt - b.createdAt);
+        });
+      } catch (err) {
+        console.error("Error fetching messages:", err);
       }
-    }
+    };
 
-  }, [room, lastExitTime]);
-
+    fetchMessages();
+  }, [tokenHash, key]);
 
   useEffect(() => {
     if (messagesContainerRef.current) {
@@ -127,31 +155,31 @@ const Chat = (props) => {
     }
   }, [messages]);
 
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Submitting message:", newMessage);
-    if (newMessage.trim() === "") return;
+    const k = keyRef.current;
+    if (newMessage.trim() === "" || !k) return;
 
-    const messageToSend = newMessage;
+    const text = newMessage;
     setNewMessage("");
 
     try {
+      const ciphertext = await encryptMessage(k, userNick, text);
       const response = await fetch(`${API_BASE}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: messageToSend, user: userNick, room: room })
+        body: JSON.stringify({ ciphertext, token_hash: tokenHash }),
       });
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
+      if (!response.ok) throw new Error('Failed to send');
     } catch (error) {
-      console.error("Error sending message:", error);
-      setNewMessage(messageToSend);
-      alert("Error sending message, please try again.");
+      console.error("Error sending:", error);
+      setNewMessage(text);
     }
   };
 
+  const copyShareLink = () => {
+    navigator.clipboard.writeText(shareUrl).catch(() => {});
+  };
 
   return (
     <div className='container'>
@@ -160,73 +188,85 @@ const Chat = (props) => {
           <span>Welcome to: {room.toUpperCase()} as {userNick}</span>
           <span className='room-timer'>
             {roomExpired ? (
-              <span style={{color: '#ff4444', fontWeight: 'bold'}}>Room closed</span>
+              <span style={{ color: '#ff4444', fontWeight: 'bold' }}>Room closed</span>
             ) : timeLeft <= 30 ? (
-              <span style={{color: '#ff4444'}}>Closing in {formatTime(timeLeft)}</span>
+              <span style={{ color: '#ff4444' }}>Closing in {formatTime(timeLeft)}</span>
             ) : (
-              <span style={{opacity: 0.7, fontSize: '0.85em'}}>{formatTime(timeLeft)}</span>
+              <span style={{ opacity: 0.7, fontSize: '0.85em' }}>{formatTime(timeLeft)}</span>
             )}
           </span>
+          {!showShare && !roomExpired && (
+            <button className='share-btn' onClick={() => setShowShare(true)}>Share</button>
+          )}
           <button className='mobile-leave-btn' onClick={signUserOut}>Leave</button>
         </div>
+
+        {showShare && (
+          <div className='share-panel'>
+            <div className='share-header'>
+              <span>Share this room</span>
+              <button onClick={() => setShowShare(false)}>&times;</button>
+            </div>
+            <div className='share-body'>
+              {qrDataUrl && <img src={qrDataUrl} alt="Room QR code" className='qr-code' />}
+              <div className='share-url'>
+                <code>{shareUrl}</code>
+                <button onClick={copyShareLink} className='copy-btn'>Copy</button>
+              </div>
+              <p className='share-note'>Anyone with this link can join. Room self-destructs in {formatTime(timeLeft)}.</p>
+            </div>
+          </div>
+        )}
+
         {roomExpired && (
           <div className='expired-banner'>
-            This room has been closed due to {Math.round((roomExpiresIn || 300) / 60)} minutes of inactivity.
+            This room has been closed after 5 minutes.
             <button onClick={signUserOut} className='rejoin-btn'>Start a new room</button>
           </div>
         )}
-        <div
-          className='messages'
-          ref={messagesContainerRef}
-        >
+
+        <div className='messages' ref={messagesContainerRef}>
           {messages.map((message) => (
             <div
               className='message'
               key={message.id}
-              style={{
-                textAlign: message.user === userNick ? 'right' : 'left',
-                padding: '5px',
-              }}
+              style={{ textAlign: message.user === userNick ? 'right' : 'left', padding: '5px' }}
             >
               <span className='user' style={{ fontWeight: 'bold', color: getColorForUser(message.user) }}>
                 {message.user}:
               </span>
-              <span>
-                {message.text}
-              </span>
+              <span>{message.text}</span>
             </div>
           ))}
         </div>
+
         {!roomExpired && (
-        <form onSubmit={handleSubmit} style={{ display: 'flex' }}>
-          <textarea
-            className='new-message-input'
-            placeholder='Message...'
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
-            }}
-            value={newMessage}
-          />
-          <button type='button'
-            onClick={handleSubmit}
-            className='send-button'>
-            <span className="btn-text">Send</span>
-            <span className="btn-icon">
-              <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-              </svg>
-            </span>
-          </button>
-        </form>
+          <form onSubmit={handleSubmit} style={{ display: 'flex' }}>
+            <textarea
+              className='new-message-input'
+              placeholder='Message...'
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+              value={newMessage}
+            />
+            <button type='button' onClick={handleSubmit} className='send-button'>
+              <span className="btn-text">Send</span>
+              <span className="btn-icon">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                </svg>
+              </span>
+            </button>
+          </form>
         )}
       </div>
     </div>
-
-  )
-}
+  );
+};
 
 export default Chat;

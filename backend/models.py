@@ -6,21 +6,14 @@ Base = declarative_base()
 
 class ActiveUser(Base):
     __tablename__ = "active_users"
-    id = Column(String, primary_key=True)  # room_nick
-    nick = Column(String, nullable=False)
-    room = Column(String, nullable=False)
+    id = Column(String(32), primary_key=True)
+    nick_hash = Column(String(32), nullable=False)
+    token_hash = Column(String(64), nullable=False, index=True)
     entered_at = Column(DateTime, default=datetime.utcnow)
 
 class Message(Base):
     __tablename__ = "messages"
     id = Column(Integer, primary_key=True, autoincrement=True)
-    text = Column(Text, nullable=False)
+    ciphertext = Column(Text, nullable=False)
+    token_hash = Column(String(64), nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    user = Column(String, nullable=False)
-    room = Column(String, nullable=False)
-
-class RoomSession(Base):
-    __tablename__ = "room_sessions"
-    nick = Column(String, primary_key=True)
-    room = Column(String, primary_key=True)
-    last_exit = Column(DateTime, default=datetime.utcnow)
