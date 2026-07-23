@@ -287,21 +287,39 @@
         flex-direction: column;
 
         .header {
-            padding: 12px 15px;
-            font-size: 1rem;
+            padding: 10px 12px;
+            font-size: 0.85rem;
             flex-shrink: 0;
             justify-content: space-between;
+            gap: 6px;
+            flex-wrap: nowrap;
+
+            > span:first-of-type {
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                flex-shrink: 1;
+                min-width: 0;
+            }
+
+            .room-timer {
+                margin-left: 0;
+                font-size: 0.75em;
+                white-space: nowrap;
+                flex-shrink: 0;
+            }
 
             .mobile-leave-btn {
                 display: block;
                 background: transparent;
                 border: 1px solid white;
                 color: white;
-                padding: 6px 12px;
+                padding: 4px 10px;
                 border-radius: 6px;
-                font-size: 0.85rem;
+                font-size: 0.75rem;
                 font-weight: bold;
                 cursor: pointer;
+                flex-shrink: 0;
             }
         }
 
