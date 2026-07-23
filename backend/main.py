@@ -9,10 +9,15 @@ from datetime import datetime
 from typing import List
 import os
 import re
+import json
+import asyncio
 from collections import defaultdict
 from datetime import datetime, timedelta
 from fastapi import WebSocket
 from fastapi.responses import HTMLResponse
+
+ROOM_LIFETIME_MINUTES = 5
+COOLDOWN_MINUTES = 5
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./chat.db")
 
@@ -54,38 +59,69 @@ def startup_rebuild_room_state():
         print(f"[Startup] Rebuilt room state: {list(room_created_at.keys())}")
     finally:
         db.close()
+    asyncio.create_task(scheduled_cleanup_loop())
 
 
 def cleanup_old_rooms(db: Session):
-    """Delete rooms that have existed for more than 30 minutes."""
+    """Delete rooms that have existed for more than ROOM_LIFETIME_MINUTES.
+    Returns list of rooms that were deleted so callers can notify WebSocket clients."""
+    deleted = []
     try:
         now = datetime.utcnow()
         rooms_to_delete = []
-        
-        # Find rooms older than 30 minutes
+
         for room, created_time in list(room_created_at.items()):
-            if now - created_time > timedelta(minutes=30):
+            if now - created_time > timedelta(minutes=ROOM_LIFETIME_MINUTES):
                 rooms_to_delete.append(room)
-        
+
         for room in rooms_to_delete:
-            # Delete all messages in this room
             db.query(Message).filter(Message.room == room).delete()
-            
-            # Delete all active users in this room
             db.query(ActiveUser).filter(ActiveUser.room == room).delete()
-            
-            # Delete all room sessions for this room
             db.query(RoomSession).filter(RoomSession.room == room).delete()
-            
-            # Remove from tracking
+
             del room_created_at[room]
-            
-            print(f"[Cleanup] Deleted room '{room}' (30 minutes lifecycle expired)")
-        
+            deleted.append(room)
+
+            print(f"[Cleanup] Deleted room '{room}' ({ROOM_LIFETIME_MINUTES} min lifecycle expired)")
+
         db.commit()
     except Exception as e:
         print(f"[Cleanup] Error: {e}")
         db.rollback()
+    return deleted
+
+async def notify_and_disconnect_expired_rooms(deleted_rooms: List[str]):
+    """Broadcast room expiry and close WebSocket connections for deleted rooms."""
+    for room in deleted_rooms:
+        msg = json.dumps({"type": "room_expired", "message": f"This room has been closed after {ROOM_LIFETIME_MINUTES} minutes of inactivity.", "room": room})
+        dead = []
+        for client in connected_clients.get(room, []):
+            try:
+                await client.send_text(msg)
+                await client.close()
+            except Exception:
+                pass
+            dead.append(client)
+        for d in dead:
+            if d in connected_clients.get(room, []):
+                connected_clients[room].remove(d)
+        if room in connected_clients and not connected_clients[room]:
+            del connected_clients[room]
+
+
+async def scheduled_cleanup_loop():
+    """Background task that periodically cleans up expired rooms and notifies clients."""
+    while True:
+        try:
+            await asyncio.sleep(30)
+            db = SessionLocal()
+            deleted = cleanup_old_rooms(db)
+            db.close()
+            if deleted:
+                await notify_and_disconnect_expired_rooms(deleted)
+        except Exception as e:
+            print(f"[ScheduledCleanup] Error: {e}")
+
 
 def get_db():
     db = SessionLocal()
@@ -148,8 +184,8 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     session_entry = db.query(RoomSession).filter(RoomSession.nick == nick, RoomSession.room == room).first()
     if session_entry and session_entry.last_exit:
          minutes_since_exit = (datetime.utcnow() - session_entry.last_exit).total_seconds() / 60
-         if minutes_since_exit < 30:
-             wait_time = int(30 - minutes_since_exit)
+         if minutes_since_exit < COOLDOWN_MINUTES:
+             wait_time = int(COOLDOWN_MINUTES - minutes_since_exit)
              raise HTTPException(status_code=429, detail=f"Nickname cooldown active. Wait {wait_time}m.")
 
     # 2. Check Duplicates
@@ -170,14 +206,22 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     # 4. Track room creation on first user join
     if room not in room_created_at:
         room_created_at[room] = datetime.utcnow()
-        print(f"[Room Created] '{room}' - will expire in 30 minutes")
+        print(f"[Room Created] '{room}' - will expire in {ROOM_LIFETIME_MINUTES} minutes")
 
     # 5. Create User
     db_user = ActiveUser(id=user_id, nick=nick, room=room)
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+    room_created = room_created_at.get(room, datetime.utcnow())
+    expires_in_seconds = max(0, int((room_created + timedelta(minutes=ROOM_LIFETIME_MINUTES) - datetime.utcnow()).total_seconds()))
+    return {
+        "id": db_user.id,
+        "nick": db_user.nick,
+        "room": db_user.room,
+        "entered_at": db_user.entered_at.isoformat(),
+        "room_expires_in_seconds": expires_in_seconds
+    }
 
 @app.delete("/active_users/{room}/{nick}")
 def delete_user(room: str, nick: str, db: Session = Depends(get_db)):
@@ -198,7 +242,7 @@ def get_messages(room: str, db: Session = Depends(get_db)):
 
 @app.post("/messages")
 async def create_message(message: MessageCreate, request: Request,db: Session = Depends(get_db)):
-    cleanup_old_rooms(db)
+    deleted_rooms = cleanup_old_rooms(db)
 
     if len(message.text) > 2000:
         raise HTTPException(status_code=400, detail="Message too long (max 2000 characters)")
@@ -226,7 +270,6 @@ async def create_message(message: MessageCreate, request: Request,db: Session = 
     await run_in_threadpool(db.refresh, db_message)
     # Broadcast to WebSocket clients
     msg_data = {"id": db_message.id, "text": db_message.text, "created_at": db_message.created_at.isoformat(), "user": db_message.user, "room": db_message.room}
-    import json
     print(f"Broadcasting message to room {message.room}: {msg_data}")
     
     dead = []
@@ -241,6 +284,9 @@ async def create_message(message: MessageCreate, request: Request,db: Session = 
     for client in dead:
         if client in connected_clients.get(message.room, []):
             connected_clients[message.room].remove(client)
+
+    if deleted_rooms:
+        await notify_and_disconnect_expired_rooms(deleted_rooms)
 
     return msg_data
 

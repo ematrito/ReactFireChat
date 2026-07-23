@@ -151,6 +151,42 @@
             .mobile-leave-btn {
                 display: none;
             }
+
+            .room-timer {
+                font-size: 0.9em;
+                margin-left: 15px;
+            }
+        }
+
+        .expired-banner {
+            background: #2a0000;
+            border: 1px solid #ff4444;
+            color: #ffaaaa;
+            padding: 20px;
+            width: 100%;
+            text-align: center;
+            font-size: 1rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+
+            .rejoin-btn {
+                background: #4c983b;
+                color: white;
+                border: none;
+                padding: 10px 24px;
+                border-radius: 8px;
+                font-size: 1rem;
+                font-weight: bold;
+                cursor: pointer;
+                transition: all 0.2s ease;
+
+                &:hover {
+                    background: #5ab848;
+                    transform: translateY(-1px);
+                }
+            }
         }
 
         .messages {

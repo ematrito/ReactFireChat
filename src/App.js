@@ -62,7 +62,7 @@ function App() {
 
   return (
     <>
-      <Chat room={userData.room} userNick={userData.nick} signUserOut={signUserOut} />
+      <Chat room={userData.room} userNick={userData.nick} signUserOut={signUserOut} roomExpiresIn={userData.roomExpiresIn} />
 
       <Grid className='sign-out'>
         <button onClick={signUserOut}>

@@ -38,8 +38,10 @@ export const Auth = ({ setIsAuth, setUserData }) => {
                 throw new Error(errData.detail || 'Failed to enter room');
             }
 
+            const data = await createResponse.json();
+
             // SUCCESS: Update App state
-            setUserData({ nick: cleanNick, room: cleanRoom });
+            setUserData({ nick: cleanNick, room: cleanRoom, roomExpiresIn: data.room_expires_in_seconds });
             setIsAuth(true); 
             setError(null);
 

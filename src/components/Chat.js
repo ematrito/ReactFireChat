@@ -2,14 +2,37 @@ import { useEffect, useState, useRef } from 'react';
 import { API_BASE } from '../api-config';
 
 const Chat = (props) => {
-  const { room, userNick, signUserOut } = props;
+  const { room, userNick, signUserOut, roomExpiresIn } = props;
 
   const [newMessage, setNewMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [lastExitTime, setLastExitTime] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(roomExpiresIn || 300);
+  const [roomExpired, setRoomExpired] = useState(false);
 
   const messagesContainerRef = useRef(null);
   const wsRef = useRef(null);
+  const expiryHandledRef = useRef(false);
+
+  useEffect(() => {
+    if (roomExpired || timeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [roomExpired]);
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
 
   const getColorForUser = (nick) => {
     const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#f97316', '#ec4899', '#3b82f6', '#14b8a6', '#eab308', '#dc2626', '#a855f7', '#0891b2', '#65a30d'];
@@ -76,6 +99,16 @@ const Chat = (props) => {
     wsRef.current.onmessage = (event) => {
       console.log('WS received:', event.data);
       const data = JSON.parse(event.data);
+      if (data.type === 'room_expired') {
+        if (!expiryHandledRef.current) {
+          expiryHandledRef.current = true;
+          setRoomExpired(true);
+          if (wsRef.current) {
+            wsRef.current.close();
+          }
+        }
+        return;
+      }
       setMessages(prev => [...prev, { ...data, createdAt: new Date(data.created_at) }]);
     };
 
@@ -125,8 +158,23 @@ const Chat = (props) => {
       <div className='chat-app'>
         <div className='header'>
           <span>Welcome to: {room.toUpperCase()} as {userNick}</span>
+          <span className='room-timer'>
+            {roomExpired ? (
+              <span style={{color: '#ff4444', fontWeight: 'bold'}}>Room closed</span>
+            ) : timeLeft <= 30 ? (
+              <span style={{color: '#ff4444'}}>Closing in {formatTime(timeLeft)}</span>
+            ) : (
+              <span style={{opacity: 0.7, fontSize: '0.85em'}}>{formatTime(timeLeft)}</span>
+            )}
+          </span>
           <button className='mobile-leave-btn' onClick={signUserOut}>Leave</button>
         </div>
+        {roomExpired && (
+          <div className='expired-banner'>
+            This room has been closed due to {Math.round((roomExpiresIn || 300) / 60)} minutes of inactivity.
+            <button onClick={signUserOut} className='rejoin-btn'>Start a new room</button>
+          </div>
+        )}
         <div
           className='messages'
           ref={messagesContainerRef}
@@ -149,6 +197,7 @@ const Chat = (props) => {
             </div>
           ))}
         </div>
+        {!roomExpired && (
         <form onSubmit={handleSubmit} style={{ display: 'flex' }}>
           <textarea
             className='new-message-input'
@@ -173,6 +222,7 @@ const Chat = (props) => {
             </span>
           </button>
         </form>
+        )}
       </div>
     </div>
 
