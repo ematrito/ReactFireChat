@@ -2,7 +2,7 @@
 
 A no-leaks, no-tracks real-time chat. Every room self-destructs after 5 minutes from creation. No chat history persists — your conversations leave zero footprint. Built for private, throwaway discussions.
 
-**[Live Demo](https://reactfirechat.onrender.com)**
+**[Live Demo](https://malnutreetofirechat.duckdns.org)**
 
 ---
 
