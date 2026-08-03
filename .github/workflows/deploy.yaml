@@ -18,6 +18,7 @@ jobs:
           port: ${{ secrets.ORACLE_PORT }}
           script: |
             cd reactfirechat
-            git pull origin main
-            npm ci --include=dev
+            git pull
+            rm -rf node_modules package_lock.json
+            npm install
             npm run build
